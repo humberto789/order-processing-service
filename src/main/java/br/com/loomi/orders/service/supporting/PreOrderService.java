@@ -11,16 +11,34 @@ import java.time.LocalDate;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * Service for handling pre-order validations and reservations.
+ *
+ * This service checks if a product is eligible for pre-order based on its release date
+ * and available pre-order slots. It reserves slots when a pre-order is validated.
+ */
 @Service
 public class PreOrderService {
 
     private final ProductCatalogService catalogService;
     private final Map<String, Integer> reservedSlots = new ConcurrentHashMap<>();
 
+    /**
+     * Constructs a PreOrderService with the given ProductCatalogService.
+     *
+     * @param catalogService the product catalog service
+     */
     public PreOrderService(ProductCatalogService catalogService) {
         this.catalogService = catalogService;
     }
 
+    /**
+     * Validates and reserves pre-order slots for a given product.
+     *
+     * @param productId the ID of the product to pre-order
+     * @param quantity  the quantity of pre-order slots to reserve
+     * @throws BusinessException if validation fails
+     */
     public synchronized void validateAndReserve(String productId, int quantity) {
         ProductInfo info = catalogService.getRequiredProduct(productId);
 

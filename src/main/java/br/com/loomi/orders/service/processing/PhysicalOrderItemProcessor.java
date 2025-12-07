@@ -21,7 +21,13 @@ import java.util.Map;
 @Component
 public class PhysicalOrderItemProcessor implements OrderItemProcessor {
 
-    private static final Logger log = LoggerFactory.getLogger(PhysicalOrderItemProcessor.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(PhysicalOrderItemProcessor.class);
+
+    private static final String METADATA_KEY_WAREHOUSE_LOCATION = "warehouseLocation";
+    private static final String METADATA_KEY_DELIVERY_ETA_DAYS = "deliveryEtaDays";
+    private static final String DELIVERY_ETA_DEFAULT = "5-10";
+    private static final String ERROR_CODE_WAREHOUSE_UNAVAILABLE = "WAREHOUSE_UNAVAILABLE";
+    private static final String WAREHOUSE_UNAVAILABLE_PREFIX = "UNAVAILABLE";
 
     private final ProductCatalogService catalogService;
     private final InventoryService inventoryService;
@@ -40,19 +46,19 @@ public class PhysicalOrderItemProcessor implements OrderItemProcessor {
         ProductInfo product = catalogService.getRequiredProduct(item.getProductId());
 
         Map<String, Object> metadata = item.getMetadata();
-        String warehouseLocation = metadata != null && metadata.get("warehouseLocation") != null
-                ? metadata.get("warehouseLocation").toString()
+        String warehouseLocation = metadata != null && metadata.get(METADATA_KEY_WAREHOUSE_LOCATION) != null
+                ? metadata.get(METADATA_KEY_WAREHOUSE_LOCATION).toString()
                 : null;
 
         if (warehouseLocation != null
-                && warehouseLocation.toUpperCase().startsWith("UNAVAILABLE")) {
+                && warehouseLocation.toUpperCase().startsWith(WAREHOUSE_UNAVAILABLE_PREFIX)) {
 
-            log.warn("WAREHOUSE_UNAVAILABLE - orderId={}, productId={}, warehouseLocation={}",
+            LOGGER.warn("WAREHOUSE_UNAVAILABLE - orderId={}, productId={}, warehouseLocation={}",
                     order.getId(), product.getProductId(), warehouseLocation);
 
             throw new BusinessException(
                     HttpStatus.SERVICE_UNAVAILABLE,
-                    "WAREHOUSE_UNAVAILABLE",
+                    ERROR_CODE_WAREHOUSE_UNAVAILABLE,
                     "Warehouse %s is currently unavailable for product %s"
                             .formatted(warehouseLocation, product.getProductId())
             );
@@ -69,17 +75,17 @@ public class PhysicalOrderItemProcessor implements OrderItemProcessor {
 
         int remaining = inventoryService.getStock(product.getProductId());
 
-        log.info("PHYSICAL process - orderId={}, productId={}, stockBefore={}, quantity={}, remaining={}",
+        LOGGER.info("PHYSICAL process - orderId={}, productId={}, stockBefore={}, quantity={}, remaining={}",
                 order.getId(), product.getProductId(), before, item.getQuantity(), remaining);
 
         if (remaining < 5) {
-            log.warn("PHYSICAL low stock detected - productId={}, remaining={}",
+            LOGGER.warn("PHYSICAL low stock detected - productId={}, remaining={}",
                     product.getProductId(), remaining);
             eventPublisher.publishLowStockAlert(product.getProductId(), remaining);
         }
 
-        if (metadata != null && metadata.containsKey("warehouseLocation")) {
-            metadata.put("deliveryEtaDays", "5-10");
+        if (metadata != null && metadata.containsKey(METADATA_KEY_WAREHOUSE_LOCATION)) {
+            metadata.put(METADATA_KEY_DELIVERY_ETA_DAYS, DELIVERY_ETA_DEFAULT);
         }
     }
 }

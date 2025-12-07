@@ -27,7 +27,7 @@ import java.util.Map;
 @Service
 public class OrderProcessingService {
 
-    private static final Logger log = LoggerFactory.getLogger(OrderProcessingService.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(OrderProcessingService.class);
 
     private final OrderRepository orderRepository;
     private final Map<ProductType, OrderItemProcessor> processorByType = new EnumMap<>(ProductType.class);
@@ -82,7 +82,7 @@ public class OrderProcessingService {
                 ));
 
         if (order.getStatus() != OrderStatus.PENDING) {
-            log.info("Order {} already processed with status {}", order.getId(), order.getStatus());
+            LOGGER.info("Order {} already processed with status {}", order.getId(), order.getStatus());
             return;
         }
 
@@ -128,7 +128,7 @@ public class OrderProcessingService {
             eventPublisher.publishOrderProcessed(order);
 
         } catch (BusinessException ex) {
-            log.warn("Business error while processing order {} - code={}, message={}",
+            LOGGER.warn("Business error while processing order {} - code={}, message={}",
                     order.getId(), ex.getCode(), ex.getMessage());
 
             OrderFailureReason reason;
@@ -143,7 +143,7 @@ public class OrderProcessingService {
             eventPublisher.publishOrderFailed(order, reason, ex.getMessage());
 
         } catch (Exception ex) {
-            log.error("Unexpected error while processing order {}", order.getId(), ex);
+            LOGGER.error("Unexpected error while processing order {}", order.getId(), ex);
 
             order.markFailed(OrderFailureReason.PAYMENT_FAILED, "Unexpected processing error");
             orderRepository.save(order);
@@ -158,15 +158,14 @@ public class OrderProcessingService {
             context.setHighValue(true);
         }
 
-        if (total.compareTo(BigDecimal.valueOf(20_000)) > 0) {
-            if (Math.random() < 0.05) {
+        if (total.compareTo(BigDecimal.valueOf(20_000)) > 0 && Math.random() < 0.05) {
                 context.setFraudAlert(true);
                 context.setFailureReason(OrderFailureReason.FRAUD_ALERT);
                 context.setFailureMessage("Fraud alert triggered");
 
                 eventPublisher.publishFraudAlert(order.getId().toString(), total);
             }
-        }
+
 
         if (Math.random() < 0.02) {
             context.setFailureReason(OrderFailureReason.PAYMENT_FAILED);

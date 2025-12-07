@@ -32,7 +32,7 @@ public class OrderDetailResponse {
             BigDecimal unitPrice,
             BigDecimal totalPrice,
             Map<String, Object> metadata
-    ) {}
+    ) { }
 
     private Long orderId;
     private String customerId;
@@ -41,9 +41,6 @@ public class OrderDetailResponse {
     private OrderStatus status;
     private Instant createdAt;
     private Instant updatedAt;
-
-    public OrderDetailResponse() {
-    }
 
     /**
      * Gets the unique order identifier.

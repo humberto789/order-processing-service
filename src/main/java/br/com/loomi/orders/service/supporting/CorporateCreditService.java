@@ -9,6 +9,9 @@ import java.math.BigDecimal;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * Service to manage corporate credit limits for customers.
+ */
 @Service
 public class CorporateCreditService {
 
@@ -16,6 +19,13 @@ public class CorporateCreditService {
 
     private final Map<String, BigDecimal> usedCreditByCustomer = new ConcurrentHashMap<>();
 
+    /**
+     * Validates if the customer has enough credit and reserves the specified amount.
+     *
+     * @param customerId the ID of the customer
+     * @param amount     the amount to reserve
+     * @throws BusinessException if the credit limit is exceeded
+     */
     public synchronized void validateAndReserve(String customerId, BigDecimal amount) {
         BigDecimal used = usedCreditByCustomer.getOrDefault(customerId, BigDecimal.ZERO);
 

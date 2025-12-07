@@ -16,9 +16,6 @@ public class CreateOrderResponse {
     private BigDecimal totalAmount;
     private Instant createdAt;
 
-    public CreateOrderResponse() {
-    }
-
     /**
      * Gets the unique order identifier.
      *
