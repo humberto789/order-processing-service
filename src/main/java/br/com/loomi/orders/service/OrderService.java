@@ -1,7 +1,6 @@
 package br.com.loomi.orders.service;
 
 import br.com.loomi.orders.domain.dto.*;
-import br.com.loomi.orders.domain.dto.*;
 import br.com.loomi.orders.domain.entity.Order;
 import br.com.loomi.orders.domain.entity.OrderItem;
 import br.com.loomi.orders.exception.BusinessException;
@@ -15,7 +14,6 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.util.List;
-import java.util.stream.Collectors;
 
 /**
  * Service responsible for order management operations.
@@ -122,7 +120,7 @@ public class OrderService {
                         i.getTotalPrice(),
                         i.getMetadata()
                 ))
-                .collect(Collectors.toList());
+                .toList();
 
         resp.setItems(items);
         return resp;

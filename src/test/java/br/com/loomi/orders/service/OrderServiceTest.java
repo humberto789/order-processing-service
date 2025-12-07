@@ -67,7 +67,6 @@ class OrderServiceTest {
         @Test
         @DisplayName("Should create order successfully with valid request")
         void shouldCreateOrderSuccessfully() {
-            // Arrange
             ProductInfo product = createProduct("BOOK-001", "Test Book", ProductType.PHYSICAL, 50.00);
             when(catalogService.getRequiredProduct("BOOK-001")).thenReturn(product);
             when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> {
@@ -84,10 +83,8 @@ class OrderServiceTest {
             request.setCustomerId("customer-123");
             request.setItems(List.of(itemRequest));
 
-            // Act
             CreateOrderResponse response = orderService.createOrder(request);
 
-            // Assert
             assertThat(response.getOrderId()).isEqualTo(1L);
             assertThat(response.getStatus()).isEqualTo(OrderStatus.PENDING);
             assertThat(response.getTotalAmount()).isEqualByComparingTo("100.00");
@@ -104,12 +101,10 @@ class OrderServiceTest {
         @Test
         @DisplayName("Should throw exception for empty items list")
         void shouldThrowExceptionForEmptyItems() {
-            // Arrange
             CreateOrderRequest request = new CreateOrderRequest();
             request.setCustomerId("customer-123");
             request.setItems(List.of());
 
-            // Act & Assert
             assertThatThrownBy(() -> orderService.createOrder(request))
                     .isInstanceOf(BusinessException.class)
                     .satisfies(ex -> {
@@ -125,12 +120,10 @@ class OrderServiceTest {
         @Test
         @DisplayName("Should throw exception for null items list")
         void shouldThrowExceptionForNullItems() {
-            // Arrange
             CreateOrderRequest request = new CreateOrderRequest();
             request.setCustomerId("customer-123");
             request.setItems(null);
 
-            // Act & Assert
             assertThatThrownBy(() -> orderService.createOrder(request))
                     .isInstanceOf(BusinessException.class);
         }
@@ -138,7 +131,6 @@ class OrderServiceTest {
         @Test
         @DisplayName("Should propagate exception when product not found")
         void shouldPropagateExceptionWhenProductNotFound() {
-            // Arrange
             when(catalogService.getRequiredProduct("NON-EXISTENT"))
                     .thenThrow(new BusinessException(HttpStatus.NOT_FOUND, "NOT_FOUND", "Product not found"));
 
@@ -150,7 +142,6 @@ class OrderServiceTest {
             request.setCustomerId("customer-123");
             request.setItems(List.of(itemRequest));
 
-            // Act & Assert
             assertThatThrownBy(() -> orderService.createOrder(request))
                     .isInstanceOf(BusinessException.class);
         }
@@ -158,7 +149,6 @@ class OrderServiceTest {
         @Test
         @DisplayName("Should calculate total for multiple items correctly")
         void shouldCalculateTotalForMultipleItems() {
-            // Arrange
             ProductInfo product1 = createProduct("BOOK-001", "Book 1", ProductType.PHYSICAL, 30.00);
             ProductInfo product2 = createProduct("BOOK-002", "Book 2", ProductType.PHYSICAL, 50.00);
 
@@ -172,27 +162,24 @@ class OrderServiceTest {
 
             CreateOrderItemRequest item1 = new CreateOrderItemRequest();
             item1.setProductId("BOOK-001");
-            item1.setQuantity(2); // 60.00
+            item1.setQuantity(2);
 
             CreateOrderItemRequest item2 = new CreateOrderItemRequest();
             item2.setProductId("BOOK-002");
-            item2.setQuantity(3); // 150.00
+            item2.setQuantity(3);
 
             CreateOrderRequest request = new CreateOrderRequest();
             request.setCustomerId("customer-123");
             request.setItems(List.of(item1, item2));
 
-            // Act
             CreateOrderResponse response = orderService.createOrder(request);
 
-            // Assert
             assertThat(response.getTotalAmount()).isEqualByComparingTo("210.00");
         }
 
         @Test
         @DisplayName("Should store correct product type from catalog")
         void shouldStoreCorrectProductType() {
-            // Arrange
             ProductInfo product = createProduct("SUB-001", "Subscription", ProductType.SUBSCRIPTION, 29.90);
             when(catalogService.getRequiredProduct("SUB-001")).thenReturn(product);
             when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> {
@@ -209,19 +196,16 @@ class OrderServiceTest {
             request.setCustomerId("customer-123");
             request.setItems(List.of(itemRequest));
 
-            // Act
             orderService.createOrder(request);
 
-            // Assert
             verify(orderRepository).save(orderCaptor.capture());
             Order savedOrder = orderCaptor.getValue();
-            assertThat(savedOrder.getItems().get(0).getProductType()).isEqualTo(ProductType.SUBSCRIPTION);
+            assertThat(savedOrder.getItems().getFirst().getProductType()).isEqualTo(ProductType.SUBSCRIPTION);
         }
 
         @Test
         @DisplayName("Should store metadata in order item")
         void shouldStoreMetadataInOrderItem() {
-            // Arrange
             ProductInfo product = createProduct("BOOK-001", "Book", ProductType.PHYSICAL, 50.00);
             when(catalogService.getRequiredProduct("BOOK-001")).thenReturn(product);
             when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> {
@@ -241,10 +225,8 @@ class OrderServiceTest {
             request.setCustomerId("customer-123");
             request.setItems(List.of(itemRequest));
 
-            // Act
             orderService.createOrder(request);
 
-            // Assert
             verify(orderRepository).save(orderCaptor.capture());
             Order savedOrder = orderCaptor.getValue();
             assertThat(savedOrder.getItems().get(0).getMetadata())
@@ -260,7 +242,6 @@ class OrderServiceTest {
         @Test
         @DisplayName("Should retrieve order by ID successfully")
         void shouldRetrieveOrderById() {
-            // Arrange
             Order order = new Order();
             order.setId(1L);
             order.setCustomerId("customer-123");
@@ -277,10 +258,8 @@ class OrderServiceTest {
 
             when(orderRepository.findById(1L)).thenReturn(Optional.of(order));
 
-            // Act
             var response = orderService.getOrder(1L);
 
-            // Assert
             assertThat(response.getOrderId()).isEqualTo(1L);
             assertThat(response.getCustomerId()).isEqualTo("customer-123");
             assertThat(response.getStatus()).isEqualTo(OrderStatus.PROCESSED);
@@ -290,10 +269,8 @@ class OrderServiceTest {
         @Test
         @DisplayName("Should throw exception when order not found")
         void shouldThrowExceptionWhenOrderNotFound() {
-            // Arrange
             when(orderRepository.findById(999L)).thenReturn(Optional.empty());
 
-            // Act & Assert
             assertThatThrownBy(() -> orderService.getOrder(999L))
                     .isInstanceOf(BusinessException.class)
                     .satisfies(ex -> {

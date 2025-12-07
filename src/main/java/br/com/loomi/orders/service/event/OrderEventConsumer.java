@@ -14,7 +14,7 @@ import org.springframework.stereotype.Component;
 @Component
 public class OrderEventConsumer {
 
-    private static final Logger log = LoggerFactory.getLogger(OrderEventConsumer.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(OrderEventConsumer.class);
 
     private final OrderProcessingService orderProcessingService;
 
@@ -41,7 +41,7 @@ public class OrderEventConsumer {
         if (!"ORDER_CREATED".equals(event.getEventType())) {
             return;
         }
-        log.info("Received ORDER_CREATED event {}", event.getPayload());
+        LOGGER.info("Received ORDER_CREATED event {}", event.getPayload());
         orderProcessingService.processOrderCreated(event);
     }
 }

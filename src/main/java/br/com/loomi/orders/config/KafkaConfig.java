@@ -31,7 +31,7 @@ import java.util.Map;
 @Configuration
 public class KafkaConfig {
 
-    private static final Logger log = LoggerFactory.getLogger(KafkaConfig.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(KafkaConfig.class);
 
     @Value("${spring.kafka.bootstrap-servers}")
     private String bootstrapServers;
@@ -106,10 +106,13 @@ public class KafkaConfig {
     @Bean
     public CommonErrorHandler kafkaErrorHandler() {
         return new DefaultErrorHandler(
-                (record, exception) -> {
-                    log.error("Failed to process message after retries. Topic: {}, Key: {}, Error: {}",
-                            record.topic(), record.key(), exception.getMessage());
-                },
+                (consumerRecord, exception) ->
+                        LOGGER.error(
+                                "Failed to process message after retries. Topic: {}, Key: {}, Error: {}",
+                                consumerRecord.topic(),
+                                consumerRecord.key(),
+                                exception.getMessage()
+                        ),
                 new FixedBackOff(2000L, 3L)
         );
     }

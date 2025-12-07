@@ -24,7 +24,7 @@ public class Order {
     @Column(nullable = false, length = 100)
     private String customerId;
 
-    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     private List<OrderItem> items = new ArrayList<>();
 
     @Column(nullable = false, precision = 10, scale = 2)
@@ -66,6 +66,7 @@ public class Order {
      * @param createdAt the creation timestamp
      * @param updatedAt the last update timestamp
      */
+    @SuppressWarnings("java:S107")
     public Order(Long id, String customerId, List<OrderItem> items, BigDecimal totalAmount,
                  OrderStatus status, OrderFailureReason failureReason, String failureMessage,
                  Instant createdAt, Instant updatedAt) {

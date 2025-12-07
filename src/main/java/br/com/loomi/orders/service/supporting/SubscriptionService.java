@@ -10,6 +10,17 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * Service for managing customer subscriptions.
+ *
+ * Validates subscription activation requests against business rules:
+ * - No duplicate active subscriptions for the same product.
+ * - Maximum of 5 active subscriptions per customer.
+ * - Incompatible subscription plans (Enterprise vs Basic/Premium).
+ *
+ * @since 1.0.0
+ * @author ChatGPT
+ */
 @Service
 public class SubscriptionService {
 
@@ -17,6 +28,13 @@ public class SubscriptionService {
 
     private final Map<String, Set<String>> activeSubscriptionsByCustomer = new ConcurrentHashMap<>();
 
+    /**
+     * Validates and activates a subscription for a customer.
+     *
+     * @param customerId the ID of the customer
+     * @param productId  the ID of the product to subscribe to
+     * @throws BusinessException if any business rule is violated
+     */
     public synchronized void validateAndActivate(String customerId, String productId) {
         Set<String> active = activeSubscriptionsByCustomer
                 .computeIfAbsent(customerId, k -> new HashSet<>());

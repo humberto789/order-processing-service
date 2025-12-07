@@ -1,11 +1,8 @@
 package br.com.loomi.orders.service.supporting;
 
 import br.com.loomi.orders.exception.BusinessException;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Nested;
-import org.junit.jupiter.api.Test;
-import org.springframework.http.HttpStatus;
+import org.junit.jupiter.api.*;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.math.BigDecimal;
 
@@ -52,7 +49,7 @@ class SupportingServicesTest {
         @Test
         @DisplayName("Should return zero for non-existent product")
         void shouldReturnZeroForNonExistentProduct() {
-            assertThat(inventoryService.getStock("NON-EXISTENT")).isEqualTo(0);
+            assertThat(inventoryService.getStock("NON-EXISTENT")).isZero();
         }
 
         @Test
@@ -174,27 +171,30 @@ class SupportingServicesTest {
         @Test
         @DisplayName("Should throw exception when credit limit exceeded")
         void shouldThrowExceptionWhenCreditLimitExceeded() {
-            assertThatThrownBy(() -> 
-                creditService.validateAndReserve("company-001", BigDecimal.valueOf(150000))
-            ).isInstanceOf(BusinessException.class)
-             .satisfies(ex -> {
-                 BusinessException be = (BusinessException) ex;
-                 assertThat(be.getCode()).isEqualTo("CREDIT_LIMIT_EXCEEDED");
-             });
+            BigDecimal amount = BigDecimal.valueOf(150000);
+
+            BusinessException exception = Assertions.assertThrows(
+                    BusinessException.class,
+                    () -> creditService.validateAndReserve("company-001", amount)
+            );
+
+            assertThat(exception.getCode()).isEqualTo("CREDIT_LIMIT_EXCEEDED");
         }
 
         @Test
         @DisplayName("Should accumulate credit usage")
         void shouldAccumulateCreditUsage() {
-            creditService.validateAndReserve("company-001", BigDecimal.valueOf(60000));
+            BigDecimal firstAmount = BigDecimal.valueOf(60_000);
+            BigDecimal secondAmount = BigDecimal.valueOf(50_000);
 
-            assertThatThrownBy(() -> 
-                creditService.validateAndReserve("company-001", BigDecimal.valueOf(50000))
-            ).isInstanceOf(BusinessException.class)
-             .satisfies(ex -> {
-                 BusinessException be = (BusinessException) ex;
-                 assertThat(be.getCode()).isEqualTo("CREDIT_LIMIT_EXCEEDED");
-             });
+            creditService.validateAndReserve("company-001", firstAmount);
+
+            BusinessException exception = assertThrows(
+                    BusinessException.class,
+                    () -> creditService.validateAndReserve("company-001", secondAmount)
+            );
+
+            assertThat(exception.getCode()).isEqualTo("CREDIT_LIMIT_EXCEEDED");
         }
 
         @Test

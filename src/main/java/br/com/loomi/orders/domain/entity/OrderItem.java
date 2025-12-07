@@ -72,6 +72,7 @@ public class OrderItem {
      * @param failureReason the reason for failure if applicable
      * @param failureMessage the failure message if applicable
      */
+    @SuppressWarnings("java:S107")
     public OrderItem(Long id, Order order, String productId, ProductType productType,
                      Integer quantity, BigDecimal unitPrice, BigDecimal totalPrice,
                      Map<String, Object> metadata, OrderFailureReason failureReason,

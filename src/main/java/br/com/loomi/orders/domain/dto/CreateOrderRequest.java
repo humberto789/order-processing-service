@@ -19,9 +19,6 @@ public class CreateOrderRequest {
     @Valid
     private List<CreateOrderItemRequest> items;
 
-    public CreateOrderRequest() {
-    }
-
     public String getCustomerId() {
         return customerId;
     }

@@ -41,6 +41,7 @@ class OrderFlowIntegrationTest {
             .withPassword("orders");
 
     @Container
+    @SuppressWarnings("java:S1874")
     static KafkaContainer kafka = new KafkaContainer(
             DockerImageName.parse("confluentinc/cp-kafka:7.6.0"));
 
@@ -98,7 +99,7 @@ class OrderFlowIntegrationTest {
         @DisplayName("Should return correct total amount based on catalog price")
         void shouldCalculateTotalFromCatalog() {
             CreateOrderItemRequest item = new CreateOrderItemRequest();
-            item.setProductId("BOOK-CC-001");  // Price: 89.90
+            item.setProductId("BOOK-CC-001");
             item.setQuantity(3);
 
             CreateOrderRequest req = new CreateOrderRequest();
@@ -110,7 +111,6 @@ class OrderFlowIntegrationTest {
 
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
             assertThat(response.getBody()).isNotNull();
-            // 89.90 * 3 = 269.70
             assertThat(response.getBody().getTotalAmount())
                     .isEqualByComparingTo("269.70");
         }
@@ -247,7 +247,7 @@ class OrderFlowIntegrationTest {
         @DisplayName("Should apply bulk discount for quantity > 100")
         void shouldApplyBulkDiscount() {
             CreateOrderItemRequest item = new CreateOrderItemRequest();
-            item.setProductId("CORP-CHAIR-ERG-001");  // Price: 899.00
+            item.setProductId("CORP-CHAIR-ERG-001");
             item.setQuantity(150);
             item.setMetadata(Map.of(
                     "cnpj", "12.345.678/0001-90",
@@ -262,7 +262,6 @@ class OrderFlowIntegrationTest {
                     "/api/orders", req, CreateOrderResponse.class);
 
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-            // Original: 899 * 150 = 134,850 - should trigger PENDING_APPROVAL (> 50k)
             assertThat(response.getBody().getTotalAmount())
                     .isEqualByComparingTo("134850.00");
         }
@@ -370,7 +369,6 @@ class OrderFlowIntegrationTest {
         @Test
         @DisplayName("Should retrieve order by ID")
         void shouldRetrieveOrderById() {
-            // Create order first
             CreateOrderItemRequest item = new CreateOrderItemRequest();
             item.setProductId("BOOK-CC-001");
             item.setQuantity(1);
@@ -384,7 +382,6 @@ class OrderFlowIntegrationTest {
 
             Long orderId = createResponse.getBody().getOrderId();
 
-            // Retrieve order
             ResponseEntity<OrderDetailResponse> getResponse = restTemplate.getForEntity(
                     "/api/orders/" + orderId, OrderDetailResponse.class);
 
@@ -409,7 +406,6 @@ class OrderFlowIntegrationTest {
         void shouldListOrdersByCustomer() {
             String customerId = "customer-list-test";
 
-            // Create multiple orders
             for (int i = 0; i < 3; i++) {
                 CreateOrderItemRequest item = new CreateOrderItemRequest();
                 item.setProductId("BOOK-CC-001");
@@ -422,7 +418,6 @@ class OrderFlowIntegrationTest {
                 restTemplate.postForEntity("/api/orders", req, CreateOrderResponse.class);
             }
 
-            // List orders
             ResponseEntity<String> response = restTemplate.getForEntity(
                     "/api/orders?customerId=" + customerId + "&page=0&size=10",
                     String.class);
@@ -452,17 +447,14 @@ class OrderFlowIntegrationTest {
 
             Long orderId = response.getBody().getOrderId();
 
-            // Wait for processing
             await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> {
                 var order = orderRepository.findById(orderId).orElseThrow();
                 assertThat(order.getStatus()).isNotEqualTo(OrderStatus.PENDING);
             });
 
-            // Get final status
             var order = orderRepository.findById(orderId).orElseThrow();
             OrderStatus finalStatus = order.getStatus();
 
-            // Wait a bit more and verify status hasn't changed
             await().during(Duration.ofSeconds(2)).untilAsserted(() -> {
                 var orderCheck = orderRepository.findById(orderId).orElseThrow();
                 assertThat(orderCheck.getStatus()).isEqualTo(finalStatus);

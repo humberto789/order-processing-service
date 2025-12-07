@@ -12,6 +12,9 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * Service for managing digital licenses for products.
+ */
 @Service
 public class DigitalLicenseService {
 
@@ -19,10 +22,23 @@ public class DigitalLicenseService {
     private final Map<String, Integer> remainingLicenses = new ConcurrentHashMap<>();
     private final Map<String, Set<String>> ownedDigitalByCustomer = new ConcurrentHashMap<>();
 
+    /**
+     * Constructs a new DigitalLicenseService with the given ProductCatalogService.
+     *
+     * @param catalogService the product catalog service
+     */
     public DigitalLicenseService(ProductCatalogService catalogService) {
         this.catalogService = catalogService;
     }
 
+    /**
+     * Allocates digital licenses to a customer for a specific product.
+     *
+     * @param customerId the ID of the customer
+     * @param productId  the ID of the product
+     * @param quantity   the number of licenses to allocate
+     * @throws BusinessException if the customer already owns the product or if there are not enough licenses available
+     */
     public synchronized void allocateLicense(String customerId, String productId, int quantity) {
         Set<String> owned = ownedDigitalByCustomer.computeIfAbsent(customerId, k -> new HashSet<>());
 

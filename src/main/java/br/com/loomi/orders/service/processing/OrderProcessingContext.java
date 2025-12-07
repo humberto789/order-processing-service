@@ -17,9 +17,6 @@ public class OrderProcessingContext {
     private String failureMessage;
     private BigDecimal totalAmount;
 
-    public OrderProcessingContext() {
-    }
-
     /**
      * Checks if the order is high value.
      *
