@@ -12,7 +12,6 @@ import br.com.loomi.orders.persistence.OrderRepository;
 import br.com.loomi.orders.service.catalog.ProductCatalogService;
 import br.com.loomi.orders.service.catalog.ProductInfo;
 import br.com.loomi.orders.service.event.OrderEventPublisher;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
