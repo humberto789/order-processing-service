@@ -6,6 +6,7 @@ import br.com.loomi.orders.exception.BusinessException;
 import br.com.loomi.orders.service.catalog.ProductCatalogService;
 import br.com.loomi.orders.service.catalog.ProductInfo;
 import br.com.loomi.orders.service.event.OrderEventPublisher;
+import br.com.loomi.orders.service.metrics.OrderMetricsService;
 import br.com.loomi.orders.service.supporting.InventoryService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,13 +33,16 @@ public class PhysicalOrderItemProcessor implements OrderItemProcessor {
     private final ProductCatalogService catalogService;
     private final InventoryService inventoryService;
     private final OrderEventPublisher eventPublisher;
+    private final OrderMetricsService metricsService;
 
     public PhysicalOrderItemProcessor(ProductCatalogService catalogService,
                                       InventoryService inventoryService,
-                                      OrderEventPublisher eventPublisher) {
+                                      OrderEventPublisher eventPublisher,
+                                      OrderMetricsService metricsService) {
         this.catalogService = catalogService;
         this.inventoryService = inventoryService;
         this.eventPublisher = eventPublisher;
+        this.metricsService = metricsService;
     }
 
     @Override
@@ -82,6 +86,7 @@ public class PhysicalOrderItemProcessor implements OrderItemProcessor {
             LOGGER.warn("PHYSICAL low stock detected - productId={}, remaining={}",
                     product.getProductId(), remaining);
             eventPublisher.publishLowStockAlert(product.getProductId(), remaining);
+            metricsService.recordLowStockAlert(product.getProductId());
         }
 
         if (metadata != null && metadata.containsKey(METADATA_KEY_WAREHOUSE_LOCATION)) {

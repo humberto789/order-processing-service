@@ -9,8 +9,11 @@ import br.com.loomi.orders.domain.event.OrderEvent;
 import br.com.loomi.orders.exception.BusinessException;
 import br.com.loomi.orders.persistence.OrderRepository;
 import br.com.loomi.orders.service.event.OrderEventPublisher;
+import br.com.loomi.orders.service.metrics.OrderMetricsService;
+import io.micrometer.core.instrument.Timer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,23 +32,42 @@ public class OrderProcessingService {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(OrderProcessingService.class);
 
+    private static final String MDC_ORDER_ID = "orderId";
+    private static final String MDC_CUSTOMER_ID = "customerId";
+
+    private static final String PAYLOAD_ORDER_ID_KEY = "orderId";
+
+    private static final String ERROR_ORDER_NOT_FOUND_CODE = "ORDER_NOT_FOUND";
+    private static final String ERROR_ORDER_NOT_FOUND_MESSAGE = "Order %s not found";
+
+    private static final String ERROR_UNSUPPORTED_TYPE_CODE = "UNSUPPORTED_TYPE";
+    private static final String ERROR_UNSUPPORTED_TYPE_MESSAGE_PREFIX = "Unsupported product type ";
+
+    private static final String FRAUD_ALERT_MESSAGE = "Fraud alert triggered";
+    private static final String PAYMENT_SIMULATION_FAILED_MESSAGE = "Payment simulation failed";
+    private static final String UNEXPECTED_PROCESSING_ERROR_MESSAGE = "Unexpected processing error";
+
     private final OrderRepository orderRepository;
     private final Map<ProductType, OrderItemProcessor> processorByType = new EnumMap<>(ProductType.class);
     private final OrderEventPublisher eventPublisher;
+    private final OrderMetricsService metricsService;
 
     /**
      * Constructs the processing service with required dependencies.
      * Automatically registers all order item processors by product type.
      *
      * @param orderRepository the order repository
-     * @param processors list of all order item processors
-     * @param eventPublisher the event publisher
+     * @param processors      list of all order item processors
+     * @param eventPublisher  the event publisher
+     * @param metricsService  the metrics service
      */
     public OrderProcessingService(OrderRepository orderRepository,
                                   List<OrderItemProcessor> processors,
-                                  OrderEventPublisher eventPublisher) {
+                                  OrderEventPublisher eventPublisher,
+                                  OrderMetricsService metricsService) {
         this.orderRepository = orderRepository;
         this.eventPublisher = eventPublisher;
+        this.metricsService = metricsService;
 
         for (OrderItemProcessor p : processors) {
             String name = p.getClass().getSimpleName();
@@ -72,104 +94,142 @@ public class OrderProcessingService {
     @Transactional
     public void processOrderCreated(OrderEvent event) {
         Map<String, Object> payload = event.getPayload();
-        Long orderId = Long.valueOf(payload.get("orderId").toString());
+        Long orderId = Long.valueOf(payload.get(PAYLOAD_ORDER_ID_KEY).toString());
 
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new BusinessException(
                         HttpStatus.NOT_FOUND,
-                        "ORDER_NOT_FOUND",
-                        "Order %s not found".formatted(orderId)
+                        ERROR_ORDER_NOT_FOUND_CODE,
+                        ERROR_ORDER_NOT_FOUND_MESSAGE.formatted(orderId)
                 ));
 
-        if (order.getStatus() != OrderStatus.PENDING) {
-            LOGGER.info("Order {} already processed with status {}", order.getId(), order.getStatus());
-            return;
-        }
+        MDC.put(MDC_ORDER_ID, orderId.toString());
+        MDC.put(MDC_CUSTOMER_ID, order.getCustomerId());
 
-        OrderProcessingContext context = new OrderProcessingContext();
-        context.setTotalAmount(order.getTotalAmount());
-
-        applyGlobalRules(order, context);
+        Timer.Sample timer = metricsService.startOrderProcessingTimer();
 
         try {
-            for (OrderItem item : order.getItems()) {
-                ProductType type = item.getProductType();
-                OrderItemProcessor processor = processorByType.get(type);
-                if (processor == null) {
-                    throw new BusinessException(
-                            HttpStatus.BAD_REQUEST,
-                            "UNSUPPORTED_TYPE",
-                            "Unsupported product type " + type
-                    );
-                }
-                processor.process(order, item, context);
-            }
-
-            if (context.isPendingApproval()) {
-                order.markPendingApproval(context.getFailureMessage());
-                orderRepository.save(order);
-                eventPublisher.publishOrderPendingApproval(order);
+            if (order.getStatus() != OrderStatus.PENDING) {
+                LOGGER.info("Order {} already processed with status {}", order.getId(), order.getStatus());
                 return;
             }
 
-            if (context.getFailureReason() != null) {
-                order.markFailed(context.getFailureReason(), context.getFailureMessage());
-                orderRepository.save(order);
-                eventPublisher.publishOrderFailed(
-                        order,
-                        context.getFailureReason(),
-                        context.getFailureMessage()
-                );
-                return;
-            }
+            OrderProcessingContext context = new OrderProcessingContext();
+            context.setTotalAmount(order.getTotalAmount());
 
-            order.markProcessed();
-            orderRepository.save(order);
-            eventPublisher.publishOrderProcessed(order);
+            applyGlobalRules(order, context);
 
-        } catch (BusinessException ex) {
-            LOGGER.warn("Business error while processing order {} - code={}, message={}",
-                    order.getId(), ex.getCode(), ex.getMessage());
-
-            OrderFailureReason reason;
             try {
-                reason = OrderFailureReason.valueOf(ex.getCode());
-            } catch (IllegalArgumentException e) {
-                reason = OrderFailureReason.INVALID_REQUEST;
+                for (OrderItem item : order.getItems()) {
+                    ProductType type = item.getProductType();
+                    OrderItemProcessor processor = processorByType.get(type);
+                    if (processor == null) {
+                        throw new BusinessException(
+                                HttpStatus.BAD_REQUEST,
+                                ERROR_UNSUPPORTED_TYPE_CODE,
+                                ERROR_UNSUPPORTED_TYPE_MESSAGE_PREFIX + type
+                        );
+                    }
+                    processor.process(order, item, context);
+
+                    metricsService.recordProductTypeProcessed(type);
+                }
+
+                if (context.isPendingApproval()) {
+                    order.markPendingApproval(context.getFailureMessage());
+                    orderRepository.save(order);
+                    eventPublisher.publishOrderPendingApproval(order);
+
+                    metricsService.recordOrderProcessed(OrderStatus.PENDING_APPROVAL);
+                    metricsService.recordOrderProcessingTime(timer, OrderStatus.PENDING_APPROVAL);
+                    return;
+                }
+
+                if (context.getFailureReason() != null) {
+                    order.markFailed(context.getFailureReason(), context.getFailureMessage());
+                    orderRepository.save(order);
+                    eventPublisher.publishOrderFailed(
+                            order,
+                            context.getFailureReason(),
+                            context.getFailureMessage()
+                    );
+
+                    metricsService.recordOrderProcessed(OrderStatus.FAILED);
+                    metricsService.recordOrderFailed(context.getFailureReason().name());
+                    metricsService.recordOrderProcessingTime(timer, OrderStatus.FAILED);
+                    return;
+                }
+
+                order.markProcessed();
+                orderRepository.save(order);
+                eventPublisher.publishOrderProcessed(order);
+
+                metricsService.recordOrderProcessed(OrderStatus.PROCESSED);
+                metricsService.recordOrderProcessingTime(timer, OrderStatus.PROCESSED);
+
+            } catch (BusinessException ex) {
+                LOGGER.warn("Business error while processing order {} - code={}, message={}",
+                        order.getId(), ex.getCode(), ex.getMessage());
+
+                OrderFailureReason reason;
+                try {
+                    reason = OrderFailureReason.valueOf(ex.getCode());
+                } catch (IllegalArgumentException e) {
+                    reason = OrderFailureReason.INVALID_REQUEST;
+                }
+
+                order.markFailed(reason, ex.getMessage());
+                orderRepository.save(order);
+                eventPublisher.publishOrderFailed(order, reason, ex.getMessage());
+
+                metricsService.recordOrderProcessed(OrderStatus.FAILED);
+                metricsService.recordOrderFailed(reason.name());
+                metricsService.recordOrderProcessingTime(timer, OrderStatus.FAILED);
+
+            } catch (Exception ex) {
+                LOGGER.error("Unexpected error while processing order {}", order.getId(), ex);
+
+                order.markFailed(OrderFailureReason.PAYMENT_FAILED, UNEXPECTED_PROCESSING_ERROR_MESSAGE);
+                orderRepository.save(order);
+                eventPublisher.publishOrderFailed(order, OrderFailureReason.PAYMENT_FAILED, ex.getMessage());
+
+                metricsService.recordOrderProcessed(OrderStatus.FAILED);
+                metricsService.recordOrderFailed(OrderFailureReason.PAYMENT_FAILED.name());
+                metricsService.recordOrderProcessingTime(timer, OrderStatus.FAILED);
             }
-
-            order.markFailed(reason, ex.getMessage());
-            orderRepository.save(order);
-            eventPublisher.publishOrderFailed(order, reason, ex.getMessage());
-
-        } catch (Exception ex) {
-            LOGGER.error("Unexpected error while processing order {}", order.getId(), ex);
-
-            order.markFailed(OrderFailureReason.PAYMENT_FAILED, "Unexpected processing error");
-            orderRepository.save(order);
-            eventPublisher.publishOrderFailed(order, OrderFailureReason.PAYMENT_FAILED, ex.getMessage());
+        } finally {
+            MDC.remove(MDC_ORDER_ID);
+            MDC.remove(MDC_CUSTOMER_ID);
         }
     }
 
+    /**
+     * Applies global business rules to the order.
+     * Sets flags in the processing context based on order total and random checks.
+     *
+     * @param order   the order being processed
+     * @param context the processing context to update
+     */
     private void applyGlobalRules(Order order, OrderProcessingContext context) {
         BigDecimal total = order.getTotalAmount();
 
         if (total.compareTo(BigDecimal.valueOf(10_000)) > 0) {
             context.setHighValue(true);
+            metricsService.recordHighValueOrder(total);
         }
 
         if (total.compareTo(BigDecimal.valueOf(20_000)) > 0 && Math.random() < 0.05) {
-                context.setFraudAlert(true);
-                context.setFailureReason(OrderFailureReason.FRAUD_ALERT);
-                context.setFailureMessage("Fraud alert triggered");
+            context.setFraudAlert(true);
+            context.setFailureReason(OrderFailureReason.FRAUD_ALERT);
+            context.setFailureMessage(FRAUD_ALERT_MESSAGE);
 
-                eventPublisher.publishFraudAlert(order.getId().toString(), total);
-            }
-
+            eventPublisher.publishFraudAlert(order.getId().toString(), total);
+            metricsService.recordFraudAlert(total);
+        }
 
         if (Math.random() < 0.02) {
             context.setFailureReason(OrderFailureReason.PAYMENT_FAILED);
-            context.setFailureMessage("Payment simulation failed");
+            context.setFailureMessage(PAYMENT_SIMULATION_FAILED_MESSAGE);
         }
     }
 }

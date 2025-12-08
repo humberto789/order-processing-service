@@ -8,6 +8,7 @@ import br.com.loomi.orders.persistence.OrderRepository;
 import br.com.loomi.orders.service.catalog.ProductCatalogService;
 import br.com.loomi.orders.service.catalog.ProductInfo;
 import br.com.loomi.orders.service.event.OrderEventPublisher;
+import br.com.loomi.orders.service.metrics.OrderMetricsService;
 import org.springframework.data.domain.*;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -25,6 +26,7 @@ public class OrderService {
     private final OrderRepository orderRepository;
     private final ProductCatalogService catalogService;
     private final OrderEventPublisher eventPublisher;
+    private final OrderMetricsService metricsService;
 
     /**
      * Constructs the order service with required dependencies.
@@ -32,13 +34,16 @@ public class OrderService {
      * @param orderRepository the order repository
      * @param catalogService the product catalog service
      * @param eventPublisher the event publisher
+     * @param metricsService the metrics service
      */
     public OrderService(OrderRepository orderRepository,
                         ProductCatalogService catalogService,
-                        OrderEventPublisher eventPublisher) {
+                        OrderEventPublisher eventPublisher,
+                        OrderMetricsService metricsService) {
         this.orderRepository = orderRepository;
         this.catalogService = catalogService;
         this.eventPublisher = eventPublisher;
+        this.metricsService = metricsService;
     }
 
     /**
@@ -80,6 +85,8 @@ public class OrderService {
 
         order.setTotalAmount(total);
         Order saved = orderRepository.save(order);
+
+        metricsService.recordOrderCreated(saved.getTotalAmount());
 
         eventPublisher.publishOrderCreated(saved);
 

@@ -12,6 +12,7 @@ import br.com.loomi.orders.persistence.OrderRepository;
 import br.com.loomi.orders.service.catalog.ProductCatalogService;
 import br.com.loomi.orders.service.catalog.ProductInfo;
 import br.com.loomi.orders.service.event.OrderEventPublisher;
+import br.com.loomi.orders.service.metrics.OrderMetricsService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -43,6 +44,9 @@ class OrderServiceTest {
 
     @Mock
     private OrderEventPublisher eventPublisher;
+
+    @Mock
+    private OrderMetricsService metricsService;
 
     @InjectMocks
     private OrderService orderService;
